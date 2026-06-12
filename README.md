@@ -104,17 +104,30 @@ mga_project/
 ├── README.md
 ├── requirements.txt
 ├── src/
-│   ├── generator.py       # Synthetic multi-session log generator
-│   ├── estimators.py      # Signal estimation (recency, frequency, unresolved, goal_rel)
-│   ├── similarity.py      # TF-IDF (toy) and sentence-transformers (real)
-│   ├── retrievers.py      # 5 retrieval methods (recency, sim, GA, MGA gate, MGA linear)
-│   ├── learn.py           # Logistic regression for theta
-│   └── metrics.py         # Recall@k, nDCG@k, Stale@k, Noise@k
+│   ├── generator.py           # Synthetic multi-session log generator
+│   ├── estimators.py          # Signal estimation (recency, frequency, unresolved, goal_rel)
+│   ├── similarity.py          # TF-IDF (toy) and sentence-transformers (real)
+│   ├── retrievers.py          # 5 retrieval methods (recency, sim, GA, MGA gate, MGA linear)
+│   ├── learn.py               # Logistic regression for theta
+│   ├── metrics.py             # Recall@k, nDCG@k, Stale@k, Noise@k
+│   └── entropy_diagnostic.py  # Attention-entropy lock detection
 ├── scripts/
-│   ├── run_benchmark.py   # Local benchmark (CPU, TF-IDF)
-│   └── modal_benchmark.py # Cloud benchmark (GPU, sentence-transformers)
+│   ├── run_benchmark.py           # Local benchmark (CPU, TF-IDF)
+│   ├── run_entropy_diagnostic.py  # Run lock detection analysis
+│   ├── modal_benchmark.py         # Cloud benchmark (GPU, sentence-transformers)
+│   ├── modal_full_benchmark.py    # Full fractal benchmark (15 worlds, K-fold, CI)
+│   ├── modal_locomo_benchmark.py  # LoCoMo-MC10 real dataset benchmark
+│   └── modal_realworld_benchmark.py # ShareGPT/OASST2 real data benchmark
+├── tests/
+│   ├── test_retrievers.py         # Retriever logic tests
+│   ├── test_estimators.py         # Signal estimator tests
+│   ├── test_metrics.py            # Metric calculation tests
+│   ├── test_entropy_diagnostic.py # Lock detection tests
+│   └── test_generator.py          # World generator tests
+├── paper/
+│   └── mga_paper.tex              # Full paper (LaTeX)
 └── outputs/
-    └── results.csv        # Raw results
+    └── results.csv                # Raw results
 ```
 
 ---
@@ -127,10 +140,27 @@ pip install numpy pandas scikit-learn
 python scripts/run_benchmark.py
 ```
 
+### Entropy diagnostic (lock detection):
+```bash
+python scripts/run_entropy_diagnostic.py
+```
+
 ### Cloud (GPU, real embeddings):
 ```bash
 pip install modal
 modal run scripts/modal_benchmark.py
+```
+
+### Real-world datasets:
+```bash
+modal run scripts/modal_locomo_benchmark.py      # LoCoMo-MC10
+modal run scripts/modal_realworld_benchmark.py   # OASST2/ShareGPT
+```
+
+### Run tests:
+```bash
+pip install pytest
+python -m pytest tests/ -v
 ```
 
 ---
@@ -152,7 +182,22 @@ modal run scripts/modal_benchmark.py
 - **GA wins overall recall/nDCG** because recency naturally filters stale nodes and the benchmark has many recency-friendly queries.
 - **MGA wins on the hard tasks** where persistent memory matters: needle recall, open-loop tracking, noise filtering.
 - **Contribution**: MGA doesn't replace GA. It fills the gap where GA (and similarity-only) fail — long-horizon, persistent-importance retrieval.
-- If GA matches MGA within CIs on all tasks, the honest contribution is the entropy diagnostic (see spec v2).
+
+---
+
+## Attention-Entropy Diagnostic (Lock Detection)
+
+Detects when a retriever is "locked" — attending to a narrow, repetitive set of nodes regardless of query content.
+
+| Retriever | Mean Entropy | Std | Top-5 Concentration |
+|-----------|:---:|:---:|:---:|
+| recency | 0.992 | 0.001 | 0.050 |
+| similarity | 0.992 | 0.005 | 0.060 |
+| GA | 0.983 | 0.005 | 0.078 |
+| **MGA gate** | 0.976 | 0.014 | 0.093 |
+| **MGA linear** | 0.650 | 0.131 | 0.467 |
+
+**Findings**: No retriever shows pathological lock. MGA linear concentrates attention most aggressively (top-5 concentration 0.467), explaining its stronger targeted recall. MGA gate maintains high entropy while still achieving selective boosting — the multiplicative structure amplifies without collapsing.
 
 ---
 
@@ -172,3 +217,4 @@ modal run scripts/modal_benchmark.py
 ## License
 
 MIT
+

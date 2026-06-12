@@ -194,13 +194,38 @@ GA combines recency + importance + similarity additively. On needle queries (old
 
 MGA's gate structure addresses this: the persistent features (especially goal-relevance and unresolvedness) amplify nodes that similarity alone identifies as marginally relevant.
 
+\subsection{Attention-Entropy Diagnostic}
+
+We introduce an attention-entropy diagnostic to detect \emph{retriever lock}---when a retriever attends to a narrow, repetitive set of nodes regardless of query content. For each retriever, we compute the normalized Shannon entropy of the softmax-transformed score distribution:
+\[
+\hat{H} = \frac{-\sum_i p_i \log p_i}{\log N}, \quad p_i = \text{softmax}(s_i).
+\]
+A retriever is ``locked'' if $\hat{H}$ is consistently low across diverse queries.
+
+\begin{table}[h]
+\centering
+\caption{Attention-entropy diagnostic (5 worlds, 29 test queries).}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Retriever} & \textbf{Mean $\hat{H}$} & \textbf{Std $\hat{H}$} & \textbf{Top-5 Conc.} \\
+\midrule
+Recency & 0.992 & 0.001 & 0.050 \\
+Similarity & 0.992 & 0.005 & 0.060 \\
+GA & 0.983 & 0.005 & 0.078 \\
+MGA gate & 0.976 & 0.014 & 0.093 \\
+MGA linear & 0.650 & 0.131 & 0.467 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All retrievers show healthy (non-locked) attention. MGA linear concentrates attention most aggressively (top-5 concentration = 0.467 vs 0.05--0.09 for others), explaining its stronger recall on targeted queries at the cost of lower diversity. MGA gate maintains high entropy (0.976) while still achieving selective boosting through the multiplicative structure---the gate amplifies without collapsing.
+
 \subsection{Limitations}
 
 \begin{enumerate}[leftmargin=2em]
 \item \textbf{Synthetic data}: Results are on template-based synthetic logs. Real-world interaction logs have greater lexical diversity, ambiguity, and implicit references.
 \item \textbf{Small training signal}: With only 4--5 training queries per world, $\boldsymbol{\theta}$ estimation is noisy. More training data would likely improve MGA.
 \item \textbf{Utility/weight features uninformative}: The benchmark does not generate enough use-episodes for these features to become meaningful. A longer-running agent would accumulate this signal.
-\item \textbf{No lock detection}: The attention-entropy diagnostic (a key theoretical contribution) is not yet benchmarked.
 \item \textbf{Overall recall}: GA still wins overall. MGA's advantage is specifically on long-horizon tasks.
 \end{enumerate}
 
